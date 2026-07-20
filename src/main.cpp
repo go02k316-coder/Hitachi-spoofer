@@ -5,12 +5,11 @@
 #endif
 
 #include <windows.h>
-#include <imgui.h>
-#include <imgui_impl_win32.h>
-#include <imgui_impl_dx11.h>
 #include <ctime>
 #include <thread>
 #include <memory>
+#include <string>
+#include <iostream>
 
 // Core modules
 #include "core/exception.h"
@@ -18,9 +17,6 @@
 #include "core/hwid_generator.h"
 
 using namespace UchihaSpoofer;
-
-// Forward declarations
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 /**
  * @brief Application state structure
@@ -52,9 +48,6 @@ static bool g_done = false;
  * @brief Window procedure
  */
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-        return true;
-
     switch (msg) {
     case WM_SIZE:
         if (msg == WM_SIZE && wParam != SIZE_MINIMIZED) {
@@ -97,7 +90,9 @@ bool InitializeApplication() {
         logger.Info("Generated MAC Address: " + hwid.macAddress);
         logger.Info("Generated GUID: " + hwid.guid);
         logger.Info("Generated Product ID: " + hwid.productId);
+        logger.Info("Generated Volume Serial C: " + hwid.volumeSerialC);
         
+        logger.Info("Application initialized successfully!");
         return true;
     }
     catch (const Core::UchihaException& e) {
@@ -187,7 +182,7 @@ int MainLoop() {
         }
         
         // Render frame
-        // TODO: Implement rendering
+        // TODO: Implement rendering (ImGui to be integrated)
         
         // Sleep to prevent busy-wait
         Sleep(16);  // ~60 FPS
