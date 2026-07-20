@@ -10,64 +10,47 @@
 #include <imgui_impl_dx11.h>
 #include <ctime>
 #include <thread>
+#include <memory>
 
 // Core modules
 #include "core/exception.h"
-#include "core/types.h"
-
-// Utils modules
 #include "utils/logger.h"
-#include "utils/system_utils.h"
-#include "utils/string_utils.h"
-#include "utils/file_utils.h"
-#include "utils/cache_manager.h"
-#include "utils/async_worker.h"
-
-// Driver module
-#include "driver/driver_manager.h"
-
-// Spoofing modules
-#include "core/identity_manager.h"
-#include "core/spoofer.h"
-#include "core/deep_cleaner.h"
-#include "core/config_manager.h"
-#include "core/hwid_presets.h"
-#include "core/backup_manager.h"
-
-// UI modules
-#include "ui/ui_manager.h"
-#include "ui/ui_styles.h"
-#include "ui/components.h"
+#include "core/hwid_generator.h"
 
 using namespace UchihaSpoofer;
 
 // Forward declarations
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-// Global state
+/**
+ * @brief Application state structure
+ */
 struct AppState {
     int activeTab = 0;
     int previousTab = 0;
     float tabAlpha = 1.0f;
     bool isSpoofed = false;
-    Core::SpoofConfig spoofConfig;
-    Core::OperationProgress spoofProgress;
-    Core::OperationProgress recoveryProgress;
-    Core::OperationProgress cleanProgress;
     
-    // Profile management
-    std::vector<std::string> profileList;
-    int selectedProfileIdx = 0;
-    char customHWIDInput[256] = {0};
-    int selectedPresetIdx = 0;
-    int selectedBackupIdx = 0;
+    // Progress tracking
+    struct OperationProgress {
+        bool isRunning = false;
+        float progress = 0.0f;
+        std::string currentTask;
+    };
+    
+    OperationProgress spoofProgress;
+    OperationProgress recoveryProgress;
+    OperationProgress cleanProgress;
 };
 
+// Global variables (minimized)
 static AppState g_appState;
 static HWND g_hwnd = nullptr;
 static bool g_done = false;
 
-// Window procedure
+/**
+ * @brief Window procedure
+ */
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
@@ -75,109 +58,186 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
     case WM_SIZE:
         if (msg == WM_SIZE && wParam != SIZE_MINIMIZED) {
-            auto& ui = UI::UIManager::GetInstance();
+            // Handle window resize
         }
         return 0;
+        
     case WM_SYSCOMMAND:
         if ((wParam & 0xfff0) == SC_KEYMENU)
             return 0;
         break;
+        
     case WM_DESTROY:
         PostQuitMessage(0);
         g_done = true;
         return 0;
     }
+    
     return DefWindowProcA(hWnd, msg, wParam, lParam);
 }
 
-// Render main interface
-void RenderMainUI() {
-    // Implementation from original HWID Spoofer.cpp
-    // UI rendering code here...
+/**
+ * @brief Initialize the application
+ */
+bool InitializeApplication() {
+    try {
+        // Initialize logger
+        auto& logger = Utils::Logger::GetInstance();
+        logger.SetMinLogLevel(Utils::LogLevel::Info);
+        logger.InitializeFileLogging("uchiha_spoofer.log");
+        
+        logger.Info("========================================");
+        logger.Info("Uchiha Spoofer v4.0.0 - Optimized Edition");
+        logger.Info("========================================");
+        logger.Info("Application initialization started...");
+        
+        // Test HWID generation
+        logger.Debug("Testing HWID Generator...");
+        auto hwid = Core::HWIDGenerator::GenerateComplete();
+        logger.Info("Generated MAC Address: " + hwid.macAddress);
+        logger.Info("Generated GUID: " + hwid.guid);
+        logger.Info("Generated Product ID: " + hwid.productId);
+        
+        return true;
+    }
+    catch (const Core::UchihaException& e) {
+        Utils::Logger::GetInstance().Critical(std::string("Exception: ") + e.what());
+        MessageBoxA(NULL, e.what(), "Uchiha Spoofer - Error", MB_ICONERROR);
+        return false;
+    }
+    catch (const std::exception& e) {
+        Utils::Logger::GetInstance().Critical(std::string("Std Exception: ") + e.what());
+        MessageBoxA(NULL, e.what(), "Uchiha Spoofer - Error", MB_ICONERROR);
+        return false;
+    }
 }
 
-int main(int, char**) {
+/**
+ * @brief Create and show the main window
+ */
+bool CreateMainWindow() {
     try {
-        srand(static_cast<unsigned int>(time(0)));
-
-        // Initialize Logger
         auto& logger = Utils::Logger::GetInstance();
-        logger.Info("[MAIN] Uchiha Spoofer v4.0.0 - Optimized Edition");
-        logger.Info("[MAIN] Starting application...");
-
-        // Initialize Identity Manager and load original identity
-        auto& idManager = Spoofing::IdentityManager::GetInstance();
-        idManager.LoadOriginalIdentity();
-        idManager.GenerateFakeIdentity();
-        g_appState.spoofConfig = Core::SpoofConfig();
-
-        // Initialize Config Manager
-        auto& configMgr = Spoofing::ConfigManager::GetInstance();
-        configMgr.LoadAllProfiles();
-
-        // Initialize Driver Manager
-        auto& driverMgr = Driver::DriverManager::GetInstance();
-        if (!driverMgr.Initialize()) {
-            logger.Warning("[MAIN] Driver could not be initialized (non-critical)");
+        logger.Info("Creating main window...");
+        
+        WNDCLASSEXA wc = {};
+        wc.cbSize = sizeof(WNDCLASSEXA);
+        wc.style = CS_CLASSDC;
+        wc.lpfnWndProc = WndProc;
+        wc.hInstance = GetModuleHandle(NULL);
+        wc.lpszClassName = "UCHIHA_CLASS";
+        
+        if (!RegisterClassExA(&wc)) {
+            throw Core::UchihaException(Core::ErrorCode::WindowCreationFailed,
+                "Failed to register window class");
         }
-
-        // Create window
-        WNDCLASSEXA wc = {sizeof(WNDCLASSEXA), CS_CLASSDC, WndProc, 0L, 0L,
-                         GetModuleHandle(NULL), NULL, NULL, NULL, NULL,
-                         "UCHIHA_CLASS", NULL};
-        RegisterClassExA(&wc);
-
-        g_hwnd = CreateWindowA(wc.lpszClassName,
-                              "UCHIHA-HITACHI SPOOFER ULTIMATE v4.0 (Optimized)",
-                              WS_OVERLAPPEDWINDOW, 100, 100, 1050, 670,
-                              NULL, NULL, wc.hInstance, NULL);
-
+        
+        g_hwnd = CreateWindowA(
+            wc.lpszClassName,
+            "UCHIHA-HITACHI SPOOFER ULTIMATE v4.0 (Optimized)",
+            WS_OVERLAPPEDWINDOW,
+            100, 100, 1050, 670,
+            NULL, NULL, wc.hInstance, NULL
+        );
+        
         if (!g_hwnd) {
             throw Core::UchihaException(Core::ErrorCode::WindowCreationFailed,
                 "Cannot create window");
         }
-
-        // Initialize UI Manager
-        auto& uiManager = UI::UIManager::GetInstance();
-        if (!uiManager.Initialize(g_hwnd)) {
-            throw Core::UchihaException(Core::ErrorCode::ImGuiInitializationFailed,
-                "Cannot initialize ImGui");
-        }
-
+        
         ShowWindow(g_hwnd, SW_SHOWDEFAULT);
         UpdateWindow(g_hwnd);
+        
+        logger.Info("Main window created successfully");
+        return true;
+    }
+    catch (const Core::UchihaException& e) {
+        Utils::Logger::GetInstance().Critical(std::string("Window Error: ") + e.what());
+        return false;
+    }
+}
 
-        logger.Info("[MAIN] UI initialized successfully!");
-        logger.Info("[MAIN] Welcome to Uchiha Spoofer v4.0!");
-
-        // Main game loop
-        while (!g_done) {
-            MSG msg;
-            while (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
-                if (msg.message == WM_QUIT)
-                    g_done = true;
+/**
+ * @brief Main application loop
+ */
+int MainLoop() {
+    auto& logger = Utils::Logger::GetInstance();
+    logger.Info("Entering main loop...");
+    
+    int frameCount = 0;
+    
+    while (!g_done) {
+        MSG msg = {};
+        
+        while (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+            
+            if (msg.message == WM_QUIT) {
+                g_done = true;
             }
-            if (g_done) break;
-
-            // Render frame
-            uiManager.BeginFrame();
-            RenderMainUI();
-            uiManager.EndFrame();
         }
+        
+        if (g_done) break;
+        
+        // Frame update
+        frameCount++;
+        if (frameCount % 1000 == 0) {
+            logger.Debug(std::string("Frame: ") + std::to_string(frameCount));
+        }
+        
+        // Render frame
+        // TODO: Implement rendering
+        
+        // Sleep to prevent busy-wait
+        Sleep(16);  // ~60 FPS
+    }
+    
+    logger.Info("Main loop exited");
+    return 0;
+}
 
-        // Cleanup
-        logger.Info("[MAIN] Shutting down...");
-        uiManager.Shutdown();
-        driverMgr.Shutdown();
+/**
+ * @brief Shutdown the application
+ */
+void ShutdownApplication() {
+    auto& logger = Utils::Logger::GetInstance();
+    logger.Info("Shutting down application...");
+    
+    if (g_hwnd) {
         DestroyWindow(g_hwnd);
-        UnregisterClassA(wc.lpszClassName, wc.hInstance);
+        g_hwnd = nullptr;
+    }
+    
+    logger.Info("Saving logs...");
+    logger.SaveToFile("uchiha_spoofer_session.log");
+    logger.Info("Application shutdown complete");
+}
 
-        logger.Info("[MAIN] Uchiha Spoofer shutdown complete!");
-        logger.SaveToFile("uchiha_session.log");
-
-        return 0;
+/**
+ * @brief Main entry point
+ */
+int main(int argc, char* argv[]) {
+    try {
+        srand(static_cast<unsigned int>(time(0)));
+        
+        // Initialize application
+        if (!InitializeApplication()) {
+            return 1;
+        }
+        
+        // Create main window
+        if (!CreateMainWindow()) {
+            return 1;
+        }
+        
+        // Run main loop
+        int result = MainLoop();
+        
+        // Cleanup
+        ShutdownApplication();
+        
+        return result;
     }
     catch (const Core::UchihaException& e) {
         Utils::Logger::GetInstance().Critical(std::string("[MAIN] Exception: ") + e.what());
