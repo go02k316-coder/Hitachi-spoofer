@@ -6,7 +6,6 @@ project(HitachiSpoofer
     DESCRIPTION "Professional HWID Spoofing Tool"
 )
 
-# C++ Standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -22,7 +21,6 @@ if(MSVC)
         /utf-8                 # UTF-8 source
         /std:c++17            # C++17 standard
         /permissive-           # Standards conformance
-        /WX                    # Warnings as errors in Release
     )
     
     # Disable specific warnings
@@ -54,7 +52,7 @@ set(INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Source files
+# Source files - Only core modules (ImGui to be added later)
 set(CORE_SOURCES
     src/core/hwid_generator.cpp
     src/core/spoofing_engine.cpp
@@ -62,10 +60,6 @@ set(CORE_SOURCES
 
 set(DRIVER_SOURCES
     src/driver/driver_interface.cpp
-)
-
-set(UI_SOURCES
-    src/ui/ui_manager.cpp
 )
 
 set(UTILS_SOURCES
@@ -76,12 +70,11 @@ set(ALL_SOURCES
     src/main.cpp
     ${CORE_SOURCES}
     ${DRIVER_SOURCES}
-    ${UI_SOURCES}
     ${UTILS_SOURCES}
 )
 
-# Create executable
-add_executable(HitachiSpoofer WIN32 ${ALL_SOURCES})
+# Create executable (Console app for now, will change to WIN32 with ImGui)
+add_executable(HitachiSpoofer ${ALL_SOURCES})
 
 # Set target properties
 set_target_properties(HitachiSpoofer PROPERTIES
@@ -92,18 +85,10 @@ set_target_properties(HitachiSpoofer PROPERTIES
 # Include directories
 target_include_directories(HitachiSpoofer PRIVATE ${INCLUDE_DIRS})
 
-# Precompiled headers (MSVC only)
-if(MSVC)
-    # Create a precompiled header
-endif()
-
 # Link libraries (Windows)
 target_link_libraries(HitachiSpoofer PRIVATE
     # System libraries
     user32                 # Window management
-    d3d11                  # DirectX 11
-    d3dcompiler            # DirectX compiler
-    dxgi                   # DXGI
     advapi32               # Registry & Security
     shell32                # Shell utilities
     oleaut32               # OLE automation
@@ -134,7 +119,6 @@ if(MSVC)
     # Group source files in IDE
     source_group("Core" FILES ${CORE_SOURCES})
     source_group("Driver" FILES ${DRIVER_SOURCES})
-    source_group("UI" FILES ${UI_SOURCES})
     source_group("Utils" FILES ${UTILS_SOURCES})
 endif()
 
@@ -148,3 +132,12 @@ install(
     DIRECTORY include/
     DESTINATION include
 )
+
+message(STATUS "========================================")
+message(STATUS "HitachiSpoofer v4.0.0 Build Configuration")
+message(STATUS "========================================")
+message(STATUS "Generator: ${CMAKE_GENERATOR}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Output: ${CMAKE_BINARY_DIR}/bin")
+message(STATUS "========================================")
