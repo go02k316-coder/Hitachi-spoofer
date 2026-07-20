@@ -1,0 +1,55 @@
+# Build directories
+build/
+bin/
+obj/
+*.sln
+*.vcxproj*
+
+# Visual Studio
+.vs/
+*.user
+*.filters
+*.VC.db
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# Output files
+*.exe
+*.dll
+*.lib
+*.obj
+
+# Logs
+*.log
+*.log.*
+uchiha_session.log
+
+# Temp files
+*.tmp
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# System
+desktop.ini
+.project
+.cproject
+.settings/
+
+# User data
+profiles/
+backups/
+config/
